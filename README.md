@@ -4,4 +4,4 @@ No dependencies required :D
 
 Clone/Download, and run 'Chess.java'
 
-![Board Screenshot](Images\screenshot.png)
+![Board Screenshot](Images//screenshot.png)
