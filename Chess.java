@@ -129,6 +129,57 @@ public class Chess implements ActionListener {
         }
     }
 
+    void checkWin(){
+        boolean whiteKing = false;
+        boolean blackKing = false;
+
+        // Check win states
+        for(int x = 0; x < sizex; x++){
+            for(int y = 0; y < sizey; y++){
+                if(board[x][y].second == '♔'){
+                    whiteKing = true;
+                } else if(board[x][y].second == '♚'){
+                    blackKing = true;
+                }
+            }
+        }
+
+        if(!whiteKing){
+            clearBoard(); // Clear board
+            displayMessage("Black wins!"); // Display win message on the board
+        } else if (!blackKing){
+            clearBoard(); // Clear board
+            displayMessage("White wins!"); // Display win message on the board
+        }
+    }
+
+    void clearBoard(){
+        for(int x = 0; x < sizex; x++){
+            for(int y = 0; y < sizey; y++){
+                board[x][y].first.setText(" ");
+            }
+        }
+    }
+
+    void displayMessage(String message){
+        int idx = 0;
+        for(int x = 0; x < sizex; x++){
+            for(int y = 0; y < sizey; y++){
+                if(!(idx >= message.length())){
+                    if(" ".equals(message.substring(idx, idx+1))){
+                        break;
+                    } else {
+                        board[x][y].first.setText(message.substring(idx, idx+1));
+                    }
+                } else {
+                    break;
+                }
+                idx++;
+            }
+            idx++;
+        }
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         // Find the pressed chess square
@@ -142,7 +193,7 @@ public class Chess implements ActionListener {
                     if(selectMove && prevx == x && prevy == y){
                         selectMove = false;
                         return;
-                    } else if(possibleMoves.contains(new Tuple<Integer, Integer>(x, y))){
+                    } else if(possibleMoves.contains(new Tuple<>(x, y))){
                         // Update button text
                         board[x][y].first.setText(board[prevx][prevy].first.getText());
                         board[prevx][prevy].first.setText(" ");
@@ -157,8 +208,6 @@ public class Chess implements ActionListener {
 
                         // Check for pawn promotion
                         if(new String(pieces).indexOf(board[x][y].second) % 6 == 5){
-                            System.out.println("WOAH");
-                            System.out.println(x);
                             if(x == 0 || x == 7){
                                 if(getColor(board[x][y].second) == 'w'){
                                     board[x][y].first.setText("♕");
@@ -177,6 +226,7 @@ public class Chess implements ActionListener {
                             player = 'w';
                         }
 
+                        checkWin();
                         return;
                     } else {
                         // Get color and piece type
