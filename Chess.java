@@ -1,6 +1,4 @@
-// TODO Castling
-// TODO win condition
-// TODO sound fx?
+// TODO choose pawn promotion
 
 package Chess;
 
@@ -15,6 +13,10 @@ import java.awt.event.ActionEvent; // 1/2 button click functionality
 import java.awt.event.ActionListener; // 2/2 button click functionality
 import javax.swing.*;
 import javax.swing.ImageIcon; // Use for images
+
+import java.io.File; // File management
+import javax.sound.sampled.*; // Sound playing
+import java.io.IOException; // Catch errors
 
 // Layout for border
 // Layout for elements
@@ -58,6 +60,16 @@ public class Chess implements ActionListener {
 
     @SuppressWarnings("unchecked")
     Tuple<JButton, Character>[][] board = new Tuple[sizex][sizey];
+    // char[][] initialBoard = {
+    //     {'♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'},
+    //     {'♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'},
+    //     {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+    //     {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+    //     {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+    //     {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+    //     {'♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'},
+    //     {'♖', ' ', ' ', ' ', '♔', ' ', ' ', '♖'}
+    // };
     char[][] initialBoard = {
         {'♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'},
         {'♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'},
@@ -67,7 +79,7 @@ public class Chess implements ActionListener {
         {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
         {'♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'},
         {'♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖'}
-    };    
+    };
 
     // Gui elements
     JFrame frame_object;
@@ -77,6 +89,11 @@ public class Chess implements ActionListener {
     int prevx = -1;
     int prevy = -1;
     boolean selectMove = false;
+
+    // Constants for castling
+    boolean castling = false; // Tells it that the next move COULD be a castle
+    Boolean[] wCanCastle = new Boolean[]{true, true, true}; // Can white castle? {rookL, rookR, king}
+    Boolean[] bCanCastle = new Boolean[]{true, true, true}; // Can black castle? {rookL, rookR, king}
 
     ArrayList<Tuple<Integer, Integer>> possibleMoves = new ArrayList<>();
 
@@ -103,10 +120,11 @@ public class Chess implements ActionListener {
                 if(((x + y) % 2) == 0){
                     board[x][y].first.setBackground(Color.WHITE);
                 } else {
-                    board[x][y].first.setBackground(Color.BLACK);
+                    board[x][y].first.setBackground(Color.BLUE);
                 }
                 board[x][y].first.setPreferredSize(new Dimension(60, 60)); // Make uniform shape
                 board[x][y].first.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 25)); // Increase font size
+                board[x][y].first.setForeground(Color.BLACK);
                 board[x][y].first.setFocusable(false);
                 panel_object.add(board[x][y].first);
             }
@@ -194,6 +212,9 @@ public class Chess implements ActionListener {
                         selectMove = false;
                         return;
                     } else if(possibleMoves.contains(new Tuple<>(x, y))){
+                        // Play sound for move
+                        playSound("q3\\Chess\\woosh.wav");
+
                         // Update button text
                         board[x][y].first.setText(board[prevx][prevy].first.getText());
                         board[prevx][prevy].first.setText(" ");
@@ -219,6 +240,24 @@ public class Chess implements ActionListener {
                             }
                         }
 
+                        // Check for king castling
+                        if((new String(pieces).indexOf(board[x][y].second) % 6 == 0) && castling){
+                            char piece = board[x][0].second;
+                            if(y < 3){
+                                board[x][3].first.setText(Character.toString(piece));
+                                board[x][3].second = piece;
+                                board[x][0].first.setText(" ");
+                                board[x][0].second = ' ';
+                            } else {
+                                board[x][5].first.setText(Character.toString(piece));
+                                board[x][5].second = piece;
+                                board[x][7].first.setText(" ");
+                                board[x][7].second = ' ';
+                            }
+
+                            castling = false;
+                        }
+
                         // Update turn
                         if(player == 'w'){
                             player = 'b';
@@ -227,7 +266,7 @@ public class Chess implements ActionListener {
                         }
 
                         checkWin();
-                        return;
+                        break;
                     } else {
                         // Get color and piece type
                         char color = getColor(board[x][y].second);
@@ -246,6 +285,31 @@ public class Chess implements ActionListener {
                 }
             }
         }
+    }
+
+    static void playSound(String path){
+        new Thread(() -> {
+            try {
+                // Load the sound file
+                File soundFile = new File(path);
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(soundFile);
+                
+                // Get a sound clip resource
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioStream);
+                
+                // Play the sound
+                clip.start();
+                
+                // Wait until the sound has finished playing
+                while (!clip.isRunning()) Thread.sleep(10);
+                while (clip.isRunning()) Thread.sleep(10);
+                
+                clip.close();
+            } catch (UnsupportedAudioFileException | IOException | LineUnavailableException | InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     static Color tintColor(JButton button, int[] tintColor) {
@@ -284,6 +348,65 @@ public class Chess implements ActionListener {
         }
     }
 
+    boolean checkForPiece(int x, int y, int type){
+        int tempy = x;
+        x = y;
+        y = tempy;
+        if(type == -1){
+            if(board[x][y].second == ' '){
+                return false;
+            } else {
+                return true;
+            }
+        } else if((new String(pieces).indexOf(board[x][y].second) % 6) == type){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    Tuple<Boolean, Boolean> castleable(char color){
+        // Change case depending on color
+        int yidx = color == 'b' ? 0 : 7;
+        boolean lcastle = false;
+        boolean rcastle = false;
+
+        // Check left case
+        if(checkForPiece(0, yidx, 2) && checkForPiece(4, yidx, 0)){
+            if(!(checkForPiece(1, yidx, -1)) && !(checkForPiece(2, yidx, -1) && !(checkForPiece(3, yidx, -1)))){
+                lcastle = true;
+            }
+        }
+        if(checkForPiece(7, yidx, 2) && checkForPiece(4, yidx, 0)){
+            if(!(checkForPiece(5, yidx, -1)) && !(checkForPiece(6, yidx, -1))){
+                rcastle = true;
+            }
+        }
+
+        return new Tuple<Boolean, Boolean>(lcastle, rcastle);
+    }
+
+    Tuple<Boolean, Boolean> checkForCastle(char color){
+        Tuple<Boolean, Boolean> checkForCastling = new Tuple<Boolean, Boolean>(false, false);
+        if(color == 'b'){
+            if(bCanCastle[2] && bCanCastle[0]){
+                checkForCastling.first = true;
+            }
+            if(bCanCastle[2] && bCanCastle[1]){
+                checkForCastling.second = true;
+            }
+        } else {
+            if(wCanCastle[2] && wCanCastle[0]){
+                checkForCastling.first = true;
+            }
+            if(wCanCastle[2] && wCanCastle[1]){
+                checkForCastling.second = true;
+            }
+        }
+
+        return checkForCastling;
+    }
+
     void displayMoves(char color, int type, int x, int y){
         // Create thing to store squares to be eval'd
         ArrayList<Tuple<Integer, Integer>> squares = new ArrayList<>();
@@ -303,14 +426,14 @@ public class Chess implements ActionListener {
 
         switch(type){
             case 0: // King
-                moves.add(new Tuple(1, 0));
-                moves.add(new Tuple(1, 1));
-                moves.add(new Tuple(1, -1));
-                moves.add(new Tuple(0, 1));
-                moves.add(new Tuple(0, -1));
-                moves.add(new Tuple(-1, 0));
-                moves.add(new Tuple(-1, 1));
-                moves.add(new Tuple(-1, -1));
+                moves.add(new Tuple<Integer, Integer>(1, 0));
+                moves.add(new Tuple<Integer, Integer>(1, 1));
+                moves.add(new Tuple<Integer, Integer>(1, -1));
+                moves.add(new Tuple<Integer, Integer>(0, 1));
+                moves.add(new Tuple<Integer, Integer>(0, -1));
+                moves.add(new Tuple<Integer, Integer>(-1, 0));
+                moves.add(new Tuple<Integer, Integer>(-1, 1));
+                moves.add(new Tuple<Integer, Integer>(-1, -1));
                 moves = new ArrayList<>(transform(moves, color));
 
                 // Loop through and validify each move
@@ -319,6 +442,29 @@ public class Chess implements ActionListener {
                     info = validify(x + move.first, y + move.second);
                     if(info.first && (info.second == 1 | info.second == 2)){
                         squares.add(new Tuple<>(move.first, move.second));
+                    }
+                }
+
+                // Check castle positions
+                Tuple<Boolean, Boolean> castleStatus = checkForCastle(color);
+                if(castleStatus.first | castleStatus.second){
+                    Tuple<Boolean, Boolean> castle = castleable(color);
+                    if(castle.first && castleStatus.first){
+                        squares.add(new Tuple<>(0, -2));
+                        castling = true;
+                    }
+                    if(castle.second && castleStatus.second){
+                        squares.add(new Tuple<>(0, 2));
+                        castling = true;
+                    }
+                }
+
+                // Check if castling, else this move makes castling illegal
+                if(!castling){
+                    if(color == 'b'){
+                        bCanCastle[2] = false;
+                    } else {
+                        wCanCastle[2] = false;
                     }
                 }
 
@@ -382,6 +528,21 @@ public class Chess implements ActionListener {
                     }
                 }
 
+                // Update castling arguments
+                if(color == 'b'){
+                    if(y == 0){
+                        bCanCastle[0] = false;
+                    } else if(y == 7) {
+                        bCanCastle[1] = false;
+                    }
+                } else {
+                    if(y == 0){
+                        wCanCastle[0] = false;
+                    } else if(y == 7) {
+                        wCanCastle[1] = false;
+                    }
+                }
+
                 break;
             case 3: // Bishop
                 increments = new int[][]{{1,1},{-1,-1},{1,-1},{-1,1}}; // All direction increments
@@ -414,14 +575,14 @@ public class Chess implements ActionListener {
 
                 break;
             case 4: // Knight
-                moves.add(new Tuple(2, 1));
-                moves.add(new Tuple(2, -1));
-                moves.add(new Tuple(-2, 1));
-                moves.add(new Tuple(-2, -1));
-                moves.add(new Tuple(1, 2));
-                moves.add(new Tuple(1, -2));
-                moves.add(new Tuple(-1, 2));
-                moves.add(new Tuple(-1, -2));
+                moves.add(new Tuple<Integer, Integer>(2, 1));
+                moves.add(new Tuple<Integer, Integer>(2, -1));
+                moves.add(new Tuple<Integer, Integer>(-2, 1));
+                moves.add(new Tuple<Integer, Integer>(-2, -1));
+                moves.add(new Tuple<Integer, Integer>(1, 2));
+                moves.add(new Tuple<Integer, Integer>(1, -2));
+                moves.add(new Tuple<Integer, Integer>(-1, 2));
+                moves.add(new Tuple<Integer, Integer>(-1, -2));
                 moves = new ArrayList<>(transform(moves, color));
 
                 // Loop through and validify each move
@@ -435,11 +596,11 @@ public class Chess implements ActionListener {
 
                 break;
             case 5: // Pawn
-                moves.add(new Tuple(1, 0));
-                moves.add(new Tuple(1, 1));
-                moves.add(new Tuple(1, -1));
+                moves.add(new Tuple<Integer, Integer>(1, 0));
+                moves.add(new Tuple<Integer, Integer>(1, 1));
+                moves.add(new Tuple<Integer, Integer>(1, -1));
                 if(x == 1 | x == 6){
-                    moves.add(new Tuple(2, 0)); // Double move forwards only availible on first layer
+                    moves.add(new Tuple<Integer, Integer>(2, 0)); // Double move forwards only availible on first layer
                 }
                 moves = new ArrayList<>(transform(moves, color));
 
@@ -500,7 +661,7 @@ public class Chess implements ActionListener {
                 if(((x + y) % 2) == 0){
                     board[x][y].first.setBackground(Color.WHITE);
                 } else {
-                    board[x][y].first.setBackground(Color.BLACK);
+                    board[x][y].first.setBackground(Color.BLUE);
                 }
             }
         }
